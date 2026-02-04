@@ -1,5 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+
+from deps import get_db
+from models import Hero
+from sqlalchemy.orm import Session
 
 app = FastAPI(title="Rivals Meta Tracker API", version="0.1.0")
 
@@ -12,17 +16,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Temporary hardcoded hero list - to be replaced with database integration
-heroes = [
-    {"id": 1, "name": "Peni Parker", "role": "Vanguard"},
-    {"id": 2, "name": "Psylocke", "role": "Duelist"},
-    {"id": 3, "name": "Invisible Woman", "role": "Strategist"},
-]
-
+# Health check endpoint
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
+# Endpoint to get all heroes
 @app.get("/heroes")
-def get_heroes():
-    return {"heroes": heroes}
+def get_heroes(db: Session = Depends(get_db)):
+    heroes = db.query(Hero).all()
+
+    return {
+        "heroes": [
+            {"id": hero.id, "name": hero.name, "role": hero.role} 
+            for hero in heroes
+        ]
+    }

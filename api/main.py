@@ -4,6 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from deps import get_db
 from models import Hero
 from sqlalchemy.orm import Session
+from database import engine, Base
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Rivals Meta Tracker API", version="0.1.0")
 

@@ -25,3 +25,18 @@ class Hero(Base):
     def __repr__(self):
         return f"<Hero(name='{self.name}', role='{self.role}', tier='{self.tier}', win_rate={self.win_rate}, pick_rate={self.pick_rate}, ban_rate={self.ban_rate}, matches_played={self.matches_played}, season='{self.season}', source='{self.source}')>"
 
+class TeamUp(Base):
+    __tablename__ = 'teamups'
+
+    id = Column(Integer, primary_key=True, index=True)
+    teamup_name = Column(String, nullable=False)
+    anchor_hero = Column(String, nullable=False)
+    partner_hero = Column(String, nullable=False)
+    win_rate = Column(Float, nullable=False)
+    pick_rate = Column(Float, nullable=True)
+    matches_played = Column(Integer, nullable=False)
+    season = Column(String, nullable=False)
+    source = Column(String, nullable=False, default='rivalstracker')
+
+    def __repr__(self):
+        return f"<TeamUp(teamup_name='{self.teamup_name}', anchor_hero='{self.anchor_hero}', partner_hero='{self.partner_hero}', win_rate={self.win_rate}, pick_rate={self.pick_rate}, matches_played={self.matches_played}, season='{self.season}', source='{self.source}')>"

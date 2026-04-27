@@ -14,6 +14,7 @@ class RecommendationRequest(BaseModel):
         my_team: list[str] | None = None
         enemy_team: list[str] | None = None
         bans: list[str] | None = None
+        role_needed: str | None = None
 
 app = FastAPI(title="Rivals Meta Tracker API", version="0.1.0")
 
@@ -74,6 +75,7 @@ def recommend_heroes(
         my_team=request.my_team,
         enemy_team=request.enemy_team,
         bans=request.bans,
+        role_needed=request.role_needed,
     )
 
     return {

@@ -39,6 +39,7 @@ def rank_heroes(
     my_team: list[str] | None = None,
     enemy_team: list[str] | None = None,
     bans: list[str] | None = None,
+    role_needed: str | None = None,
 ) -> list[tuple[Hero, float, float, float]]:
     """
     Rank heroes by base meta score + teamup synergy with current team.
@@ -51,8 +52,14 @@ def rank_heroes(
     bans = bans or []
 
     unavailable_heroes = set(my_team + enemy_team + bans)
-    
+
     filtered_heroes = [hero for hero in heroes if hero.name not in unavailable_heroes]
+
+    if role_needed:
+        filtered_heroes = [
+            hero for hero in filtered_heroes
+            if hero.role.lower() == role_needed.lower()
+        ]
 
     scored_heroes = []
 

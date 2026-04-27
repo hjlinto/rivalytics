@@ -4,7 +4,8 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import Base, engine
-from models import Hero, TeamUp  # import every model so SQLAlchemy knows all tables
+# Import models to ensure they are registered with SQLAlchemy
+from models import Hero, TeamUp
 
 
 def reset_database():

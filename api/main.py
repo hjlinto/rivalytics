@@ -15,6 +15,20 @@ class RecommendationRequest(BaseModel):
         enemy_team: list[str] | None = None
         bans: list[str] | None = None
         role_needed: str | None = None
+        top_n: int = 5
+
+class HeroRecommendation(BaseModel):
+    hero: str
+    role: str
+    score: float
+    win_rate: float
+    pick_rate: float
+    ban_rate: float
+    base_score: float
+    teamup_score: float
+
+class RecommendationResponse(BaseModel):
+    recommendations: list[HeroRecommendation]
 
 app = FastAPI(title="Rivals Meta Tracker API", version="0.1.0")
 
@@ -61,7 +75,7 @@ def get_teamups(db: Session = Depends(get_db)):
     }
 
 # Endpoint to get hero recommendations based on current team, enemy team, and bans
-@app.post("/recommend")
+@app.post("/recommend", response_model=RecommendationResponse)
 def recommend_heroes(
     request: RecommendationRequest,
     db: Session = Depends(get_db),
@@ -69,6 +83,7 @@ def recommend_heroes(
     heroes = db.query(Hero).all()
     teamups = db.query(TeamUp).all()
 
+    # Rank heroes based on meta score and team synergy
     ranked = rank_heroes(
         heroes=heroes,
         teamups=teamups,
@@ -78,6 +93,10 @@ def recommend_heroes(
         role_needed=request.role_needed,
     )
 
+    # Only return top N recommendations
+    ranked = ranked[:request.top_n]
+
+    # Format the response
     return {
         "recommendations": [
             {

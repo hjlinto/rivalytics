@@ -5,8 +5,15 @@ from deps import get_db
 from models import Hero, TeamUp
 from sqlalchemy.orm import Session
 from database import engine, Base
+from pydantic import BaseModel
+from services.recommender import rank_heroes
 
 Base.metadata.create_all(bind=engine)
+
+class RecommendationRequest(BaseModel):
+        my_team: list[str] | None = None
+        enemy_team: list[str] | None = None
+        bans: list[str] | None = None
 
 app = FastAPI(title="Rivals Meta Tracker API", version="0.1.0")
 
@@ -49,5 +56,38 @@ def get_teamups(db: Session = Depends(get_db)):
                 "partner_hero": teamup.partner_hero
             } 
             for teamup in teamups
+        ]
+    }
+
+# Endpoint to get hero recommendations based on current team, enemy team, and bans
+@app.post("/recommend")
+def recommend_heroes(
+    request: RecommendationRequest,
+    db: Session = Depends(get_db),
+):
+    heroes = db.query(Hero).all()
+    teamups = db.query(TeamUp).all()
+
+    ranked = rank_heroes(
+        heroes=heroes,
+        teamups=teamups,
+        my_team=request.my_team,
+        enemy_team=request.enemy_team,
+        bans=request.bans,
+    )
+
+    return {
+        "recommendations": [
+            {
+                "hero": hero.name,
+                "role": hero.role,
+                "score": round(total_score, 2),
+                "win_rate": hero.win_rate,
+                "pick_rate": hero.pick_rate,
+                "ban_rate": hero.ban_rate,
+                "base_score": round(base_score, 2),
+                "teamup_score": round(teamup_score, 2),
+            }
+            for hero, total_score, base_score, teamup_score in ranked
         ]
     }

@@ -39,11 +39,17 @@ def parse_teamup_card(card: dict, season: str, source_url: str) -> TeamUpStatIn:
         results = []
 
         for variant in card["variants"]:
+            clean_heroes = [
+                 hero.strip()
+                 for hero in variant["heroes"]
+                    if hero.strip()
+            ]
+            
             results.append(
                 TeamUpStatIn(
                     **base_data,
-                    anchor_hero=variant["anchor_hero"].strip(),
-                    partner_hero=variant["partner_hero"].strip(),
+                    heroes=clean_heroes,
+                    variant_size = len(clean_heroes),
                 )
             )
         return results

@@ -23,8 +23,8 @@ class HeroStatIn(BaseModel):
 class TeamUpStatIn(BaseModel):
     teamup_name: str
     normalized_teamup_name: str
-    anchor_hero: str
-    partner_hero: str
+    heroes: list[str]
+    variant_size: int
 
     win_rate: float
     pick_rate: float | None = None

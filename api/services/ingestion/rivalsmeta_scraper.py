@@ -45,3 +45,52 @@ def extract_hero_rows(html: str) -> list[dict]:
         )
 
     return rows
+
+def extract_teamup_cards(html: str) -> list[dict]:
+    soup = BeautifulSoup(html, "html.parser")
+    cards = []
+
+    for article in soup.select("article.teamup-card"):
+        name_el = article.select_one(".card-head .name")
+        tier_el = article.select_one(".tier-letter")
+        win_rate_el = article.select_one(".card-stats .wr")
+        pick_rate_el = article.select_one(".card-stats .pr")
+
+        stat_values = article.select(".card-stats .val")
+        matches_el = stat_values[2] if len(stat_values) >= 3 else None
+
+        if not name_el or not tier_el or not win_rate_el or not pick_rate_el or not matches_el:
+            continue
+
+        variants = []
+
+        for variant_row in article.select(".variant-row"):
+            hero_imgs = variant_row.select(".v-hero img")
+
+            hero_names = [
+                img.get("alt", "").strip()
+                for img in hero_imgs
+                if img.get("alt", "").strip()
+            ]
+
+            if len(hero_names) < 2:
+                continue
+
+            variants.append(
+                {
+                    "heroes": hero_names,
+                }
+            )
+
+        cards.append(
+            {
+                "teamup_name": name_el.get_text(strip=True),
+                "Tier": tier_el.get_text(strip=True),
+                "Win Rate": win_rate_el.get_text(strip=True),
+                "Pick Rate": pick_rate_el.get_text(strip=True),
+                "Matches": matches_el.get_text(strip=True),
+                "variants": variants,
+            }
+        )
+
+    return cards

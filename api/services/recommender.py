@@ -1,4 +1,4 @@
-from models import Hero, TeamUp
+from api.models import Hero, TeamUp
 
 
 def calculate_hero_score(hero: Hero) -> float:

@@ -1,12 +1,12 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
-from deps import get_db
-from models import Hero, TeamUp
+from api.deps import get_db
+from api.models import Hero, TeamUp
 from sqlalchemy.orm import Session
 from api.database import engine, Base
 from pydantic import BaseModel
-from services.recommender import rank_heroes
+from api.services.recommender import rank_heroes
 
 # Create database tables if they don't exist
 Base.metadata.create_all(bind=engine)
@@ -27,10 +27,12 @@ class HeroRecommendation(BaseModel):
     """
     hero: str
     role: str
+    tier: str
     score: float
     win_rate: float
     pick_rate: float
     ban_rate: float
+    matches_played: int
     base_score: float
     teamup_score: float
 
@@ -77,8 +79,12 @@ def get_teamups(db: Session = Depends(get_db)):
             {
                 "id": teamup.id, 
                 "teamup_name": teamup.teamup_name, 
-                "anchor_hero": teamup.anchor_hero, 
-                "partner_hero": teamup.partner_hero
+                "heroes": teamup.heroes.split(","),
+                "variant_size": teamup.variant_size,
+                "tier": teamup.tier,
+                "win_rate": teamup.win_rate,
+                "pick_rate": teamup.pick_rate,
+                "matches_played": teamup.matches_played,
             } 
             for teamup in teamups
         ]
@@ -112,10 +118,12 @@ def recommend_heroes(
             {
                 "hero": hero.name,
                 "role": hero.role,
+                "tier": hero.tier,
                 "score": round(total_score, 2),
                 "win_rate": hero.win_rate,
                 "pick_rate": hero.pick_rate,
                 "ban_rate": hero.ban_rate,
+                "matches_played": hero.matches_played,
                 "base_score": round(base_score, 2),
                 "teamup_score": round(teamup_score, 2),
             }

@@ -4,8 +4,8 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from api.database import SessionLocal
-from models import Hero, TeamUp
-from services.recommender import rank_heroes
+from api.models import Hero, TeamUp
+from api.services.recommender import rank_heroes
 
 
 def main():

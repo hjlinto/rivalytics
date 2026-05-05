@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from deps import get_db
 from models import Hero, TeamUp
 from sqlalchemy.orm import Session
-from database import engine, Base
+from api.database import engine, Base
 from pydantic import BaseModel
 from services.recommender import rank_heroes
 

@@ -35,6 +35,7 @@ class TeamUpStatIn(BaseModel):
     matches_played: int
     season: str
     game_mode: str = "competitive"
+    tier: str | None = None
 
     source: str = "rivalstracker"
     source_url: str

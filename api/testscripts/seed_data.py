@@ -6,7 +6,9 @@ from models import Hero, TeamUp
 
 db = SessionLocal()
 
-# Hero Data
+"""
+This script seeds the database with initial hero and teamup data for testing purposes.
+"""
 heroes = [
     Hero(
         name="Magneto",

@@ -2,6 +2,9 @@ from bs4 import BeautifulSoup
 
 
 def role_from_src(src: str) -> str:
+    """
+    Determine the hero role based on the image source URL.
+    """
     src = src.lower()
 
     if "vanguard" in src:
@@ -15,9 +18,12 @@ def role_from_src(src: str) -> str:
 
 
 def extract_hero_rows(html: str) -> list[dict]:
+    """
+    Extract hero data from the given HTML content.
+    """
     soup = BeautifulSoup(html, "html.parser")
     rows = []
-
+    # Iterate through each table row and extract hero information
     for tr in soup.find_all("tr"):
         hero_link = tr.select_one("a.cha")
         if hero_link is None:
@@ -28,7 +34,7 @@ def extract_hero_rows(html: str) -> list[dict]:
         tier_el = tr.select_one(".tier")
 
         cells = tr.find_all("td")
-
+        # Ensure that all required elements are present before extracting data
         if not name_el or not role_img or not tier_el or len(cells) < 7:
             continue
 
@@ -47,9 +53,12 @@ def extract_hero_rows(html: str) -> list[dict]:
     return rows
 
 def extract_teamup_cards(html: str) -> list[dict]:
+    """
+    Extract teamup card data from the given HTML content.
+    """
     soup = BeautifulSoup(html, "html.parser")
     cards = []
-
+    # Iterate through each teamup card and extract relevant information
     for article in soup.select("article.teamup-card"):
         name_el = article.select_one(".card-head .name")
         tier_el = article.select_one(".tier-letter")
@@ -59,11 +68,13 @@ def extract_teamup_cards(html: str) -> list[dict]:
         stat_values = article.select(".card-stats .val")
         matches_el = stat_values[2] if len(stat_values) >= 3 else None
 
+        # Ensure that all required elements are present before extracting data
         if not name_el or not tier_el or not win_rate_el or not pick_rate_el or not matches_el:
             continue
 
         variants = []
 
+        # Iterate through each variant row within the teamup card and extract hero names
         for variant_row in article.select(".variant-row"):
             hero_imgs = variant_row.select(".v-hero img")
 

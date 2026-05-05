@@ -7,6 +7,9 @@ from api.services.ingestion.normalization import (
 
 
 def parse_hero_row(row: dict, season: str, source_url: str) -> HeroStatIn:
+    """
+    Parses a single hero row from RivalsMeta into a HeroStatIn object.
+    """
     return HeroStatIn(
         name=row["Hero"].strip(),
         normalized_name=normalize_name(row["Hero"]),
@@ -23,6 +26,10 @@ def parse_hero_row(row: dict, season: str, source_url: str) -> HeroStatIn:
 
 
 def parse_teamup_card(card: dict, season: str, source_url: str) -> TeamUpStatIn:
+        """
+        Parses a single teamup card from RivalsMeta into a list of TeamUpStatIn objects.
+        Each card may contain multiple variants, so we return a list of TeamUpStatIn for each variant.
+        """
         teamup_name=card["teamup_name"].strip()
 
         base_data = {
@@ -37,14 +44,14 @@ def parse_teamup_card(card: dict, season: str, source_url: str) -> TeamUpStatIn:
         }
 
         results = []
-
+        # Each variant may have a different set of heroes, so we need to create a TeamUpStatIn for each variant
         for variant in card["variants"]:
             clean_heroes = [
                  hero.strip()
                  for hero in variant["heroes"]
                     if hero.strip()
             ]
-            
+            #
             results.append(
                 TeamUpStatIn(
                     **base_data,
@@ -55,10 +62,16 @@ def parse_teamup_card(card: dict, season: str, source_url: str) -> TeamUpStatIn:
         return results
 
 def parse_hero_rows(rows: list[dict], season: str, source_url: str) -> list[HeroStatIn]:
+    """
+    Parses a list of hero rows from RivalsMeta into a list of HeroStatIn objects.
+    """
     return [parse_hero_row(row, season, source_url) for row in rows]
 
 
 def parse_teamup_cards(cards: list[dict], season: str, source_url: str) -> list[TeamUpStatIn]:
+    """
+    Parses a list of teamup cards from RivalsMeta into a list of TeamUpStatIn objects.
+    """
     results = []
     for card in cards:
         results.extend(parse_teamup_card(card, season, source_url))

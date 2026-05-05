@@ -8,9 +8,13 @@ from database import engine, Base
 from pydantic import BaseModel
 from services.recommender import rank_heroes
 
+# Create database tables if they don't exist
 Base.metadata.create_all(bind=engine)
 
 class RecommendationRequest(BaseModel):
+        """
+        Request model for hero recommendations.
+        """
         my_team: list[str] | None = None
         enemy_team: list[str] | None = None
         bans: list[str] | None = None
@@ -18,6 +22,9 @@ class RecommendationRequest(BaseModel):
         top_n: int = 5
 
 class HeroRecommendation(BaseModel):
+    """
+    Model representing a hero recommendation with relevant stats and scores.
+    """
     hero: str
     role: str
     score: float
@@ -28,8 +35,11 @@ class HeroRecommendation(BaseModel):
     teamup_score: float
 
 class RecommendationResponse(BaseModel):
+    """
+    Response model containing a list of hero recommendations.
+    """
     recommendations: list[HeroRecommendation]
-
+# Initialize FastAPI app
 app = FastAPI(title="Rivals Meta Tracker API", version="0.1.0")
 
 # For local development only - will run on localhost:3000

@@ -1,14 +1,16 @@
 import os
 import sys
-
+# Add the parent directory to the system path to allow imports from the main project
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import Base, engine
-# Import models to ensure they are registered with SQLAlchemy
 from models import Hero, TeamUp
 
 
 def reset_database():
+    """Drops all tables and recreates them.
+    WARNING: This will delete all local data. Use with caution.
+    """
     print("Dropping all tables...")
     Base.metadata.drop_all(bind=engine)
 
@@ -17,7 +19,7 @@ def reset_database():
 
     print("Database reset complete.")
 
-
+# This script can be run directly to reset the local database.
 if __name__ == "__main__":
     confirm = input("This will delete all local data. Type RESET to continue: ")
 

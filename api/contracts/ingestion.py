@@ -1,8 +1,10 @@
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 
-# Pydantic models for data ingestion
 class HeroStatIn(BaseModel):
+    """
+    Pydantic model for hero stats ingestion.
+    """
     name: str
     normalized_name: str
     role: str
@@ -19,8 +21,10 @@ class HeroStatIn(BaseModel):
     source_url: str
     collected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-# Pydantic model for teamup stats ingestion
 class TeamUpStatIn(BaseModel):
+    """
+    Pydantic model for teamup stats ingestion.
+    """
     teamup_name: str
     normalized_teamup_name: str
     heroes: list[str]

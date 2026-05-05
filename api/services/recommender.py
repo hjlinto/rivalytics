@@ -33,6 +33,16 @@ def calculate_teamup_score(teamup: TeamUp) -> float:
 
     return score
 
+def parse_teamup_heroes(teamup: TeamUp) -> list[str]:
+    """
+    Extract the hero names from a teamup.
+    """
+    return [
+        hero.strip()
+        for hero in teamup.heroes.split(',')
+        if hero.strip()  # filter out any empty strings
+    ]
+
 def rank_heroes(
     heroes: list[Hero],
     teamups: list[TeamUp],
@@ -42,19 +52,29 @@ def rank_heroes(
     role_needed: str | None = None,
 ) -> list[tuple[Hero, float, float, float]]:
     """
-    Rank heroes by base meta score + teamup synergy with current team.
-
-    Returns:
-        (hero, total_score, base_score, teamup_score)
+    Rank heroes based on their base meta score and synergy with your current team.
+    
+    A teamup contributes synergy when:
+    - the candidate hero is part of the teamup variant
+    - at least one current ally is also part of that same variant
     """
     my_team = my_team or []
     enemy_team = enemy_team or []
     bans = bans or []
+    
+    # Create a set of unavailable heroes based on your team, the enemy team, and bans for quick lookup.
+    unavailable_heroes = {
+        name.lower()
+        for name in my_team + enemy_team + bans
+    }
 
-    unavailable_heroes = set(my_team + enemy_team + bans)
+    # Create a filtered list of heroes that excludes those on your team, the enemy team, or banned.
+    filtered_heroes = [
+        hero for hero in heroes 
+        if hero.name.lower() not in unavailable_heroes
+    ]
 
-    filtered_heroes = [hero for hero in heroes if hero.name not in unavailable_heroes]
-
+    # If a specific role is needed, filter heroes to only include those with that role.
     if role_needed:
         filtered_heroes = [
             hero for hero in filtered_heroes
@@ -62,24 +82,20 @@ def rank_heroes(
         ]
 
     scored_heroes = []
-
+    
+    # For each hero, calculate their base score and then add any synergy scores from teamups with your current team.
     for hero in filtered_heroes:
         base_score = calculate_hero_score(hero)
         teamup_score_total = 0.0
 
-        # check if this hero has a teamup with anyone on your team
+        # Check each teamup to see if it includes the candidate hero and at least one ally from your current team.
         for teamup in teamups:
-            is_anchor_match = (
-                teamup.anchor_hero == hero.name
-                and teamup.partner_hero in my_team
-            )
+           teamup_heroes = parse_teamup_heroes(teamup)
 
-            is_partner_match = (
-                teamup.partner_hero == hero.name
-                and teamup.anchor_hero in my_team
-            )
+           candidate_in_teamup = hero.name in teamup_heroes
+           ally_in_teamup = any(ally in teamup_heroes for ally in my_team)
 
-            if is_anchor_match or is_partner_match:
+           if candidate_in_teamup and ally_in_teamup:
                 teamup_score_total += calculate_teamup_score(teamup)
 
         total_score = base_score + teamup_score_total

@@ -9,6 +9,11 @@ from services.recommender import rank_heroes
 
 
 def main():
+    """
+    Test the hero recommendation system by ranking heroes based on a sample team composition.
+    This function sets up a sample team and enemy composition, retrieves hero and teamup data from the database,
+    and prints out the ranked heroes with their scores.
+    """
     db = SessionLocal()
 
     my_team = ["Scarlet Witch"]

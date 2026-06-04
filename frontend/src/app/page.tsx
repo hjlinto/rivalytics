@@ -3,11 +3,11 @@
 /**
  * Rivalytics home page.
  *
- * This page owns the recommendation workflow:
- * - loading hero data from the backend
- * - tracking draft selections
- * - submitting recommendation requests
- * - rendering the composed dashboard layout
+ * Owns the recommendation workflow:
+ * - loading heroes
+ * - tracking draft state
+ * - requesting top 3 recommendations per role
+ * - composing the dashboard layout
  */
 
 import { useEffect, useState } from "react";
@@ -16,11 +16,24 @@ import type { Dispatch, SetStateAction } from "react";
 import { HeroInput } from "./_components/HeroInput";
 import { Panel } from "./_components/Panel";
 import { RecommendationCard } from "./_components/RecommendationCard";
-import { StatPill } from "./_components/StatPill";
 import type { Hero, Recommendation } from "@/types/rivalytics";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+
+const RECOMMENDATION_ROLES = ["Vanguard", "Duelist", "Strategist"] as const;
+
+type RecommendationRole = (typeof RECOMMENDATION_ROLES)[number];
+
+type GroupedRecommendations = Record<RecommendationRole, Recommendation[]>;
+
+function createEmptyRecommendations(): GroupedRecommendations {
+  return {
+    Vanguard: [],
+    Duelist: [],
+    Strategist: [],
+  };
+}
 
 function updateSlot(
   setter: Dispatch<SetStateAction<string[]>>,
@@ -34,12 +47,40 @@ function updateSlot(
   });
 }
 
+async function fetchWithRetry(
+  url: string,
+  options?: RequestInit,
+  retries = 3,
+  delayMs = 500
+): Promise<Response> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < retries; attempt += 1) {
+    try {
+      const response = await fetch(url, options);
+
+      if (response.ok) {
+        return response;
+      }
+
+      lastError = new Error(`Request failed with status ${response.status}`);
+    } catch (error) {
+      lastError = error as Error;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+
+  throw lastError ?? new Error("Request failed.");
+}
+
 export default function Home() {
   const [heroes, setHeroes] = useState<Hero[]>([]);
   const [myTeam, setMyTeam] = useState<string[]>(["", "", "", "", ""]);
   const [enemyTeam, setEnemyTeam] = useState<string[]>(["", "", "", "", "", ""]);
   const [bans, setBans] = useState<string[]>(["", "", "", ""]);
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [recommendations, setRecommendations] =
+    useState<GroupedRecommendations>(createEmptyRecommendations);
   const [loadingHeroes, setLoadingHeroes] = useState(false);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [error, setError] = useState("");
@@ -50,16 +91,12 @@ export default function Home() {
         setLoadingHeroes(true);
         setError("");
 
-        const response = await fetch(`${API_BASE_URL}/heroes`);
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch heroes.");
-        }
-
+        const response = await fetchWithRetry(`${API_BASE_URL}/heroes`);
         const data = await response.json();
+
         setHeroes(data.heroes ?? []);
       } catch {
-        setError("Could not load heroes. Make sure the backend is running.");
+        setError("Could not load hero data. Please refresh the page and try again.");
         setHeroes([]);
       } finally {
         setLoadingHeroes(false);
@@ -75,36 +112,47 @@ export default function Home() {
     return values.filter((name) => name.trim() !== "" && heroNames.includes(name));
   }
 
+  async function fetchRecommendationsForRole(
+    role: RecommendationRole
+  ): Promise<Recommendation[]> {
+    const payload = {
+      my_team: cleanTeam(myTeam),
+      enemy_team: cleanTeam(enemyTeam),
+      bans: cleanTeam(bans),
+      role_needed: role,
+      top_n: 3,
+    };
+
+    const response = await fetchWithRetry(`${API_BASE_URL}/recommend`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
+    return data.recommendations ?? [];
+  }
+
   async function getRecommendations() {
     try {
       setLoadingRecommendations(true);
       setError("");
 
-      const payload = {
-        my_team: cleanTeam(myTeam),
-        enemy_team: cleanTeam(enemyTeam),
-        bans: cleanTeam(bans),
-        role_needed: null,
-        top_n: 5,
-      };
+      const groupedResults = await Promise.all(
+        RECOMMENDATION_ROLES.map(async (role) => {
+          const roleRecommendations = await fetchRecommendationsForRole(role);
 
-      const response = await fetch(`${API_BASE_URL}/recommend`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+          return [role, roleRecommendations] as const;
+        })
+      );
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch recommendations.");
-      }
-
-      const data = await response.json();
-      setRecommendations(data.recommendations ?? []);
+      setRecommendations(Object.fromEntries(groupedResults) as GroupedRecommendations);
     } catch {
-      setError("Could not fetch recommendations.");
-      setRecommendations([]);
+      setError("Could not fetch recommendations. Please try again.");
+      setRecommendations(createEmptyRecommendations());
     } finally {
       setLoadingRecommendations(false);
     }
@@ -114,187 +162,182 @@ export default function Home() {
     setMyTeam(["", "", "", "", ""]);
     setEnemyTeam(["", "", "", "", "", ""]);
     setBans(["", "", "", ""]);
-    setRecommendations([]);
+    setRecommendations(createEmptyRecommendations());
     setError("");
   }
 
+  const hasRecommendations = RECOMMENDATION_ROLES.some(
+    (role) => recommendations[role].length > 0
+  );
+
   return (
     <main className="min-h-screen bg-slate-950 text-white">
-      <div className="w-full px-6 py-8 lg:px-10">
-        <header className="mb-8 overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 p-8 shadow-2xl">
-          <div className="flex flex-col gap-8 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-5xl">
-              <p className="text-sm font-black uppercase tracking-[0.35em] text-indigo-400">
-                Rivalytics
-              </p>
-              <h1 className="mt-3 text-5xl font-black tracking-tight md:text-6xl">
-                Marvel Rivals Recommendation Engine
-              </h1>
-              <p className="mt-5 max-w-4xl text-lg leading-8 text-slate-400">
-                Build a draft scenario, account for allied picks, enemy picks,
-                and bans, then generate ranked recommendations using hero meta
-                data and team-up synergy.
-              </p>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:w-[26rem]">
-              <button
-                type="button"
-                onClick={getRecommendations}
-                disabled={loadingHeroes || loadingRecommendations}
-                className="rounded-xl bg-indigo-600 px-6 py-4 text-sm font-black uppercase tracking-wide text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {loadingRecommendations ? "Generating..." : "Recommend"}
-              </button>
-
-              <button
-                type="button"
-                onClick={clearDraft}
-                className="rounded-xl border border-slate-700 px-6 py-4 text-sm font-black uppercase tracking-wide text-slate-300 transition hover:bg-slate-800"
-              >
-                Clear Draft
-              </button>
-            </div>
+      <section className="mx-auto w-full max-w-[1600px] px-6 py-10">
+        <header className="mb-8 grid gap-6 lg:grid-cols-[1.5fr_auto] lg:items-end">
+          <div>
+            <p className="mb-3 text-sm font-semibold uppercase tracking-[0.25em] text-indigo-400">
+              Rivalytics
+            </p>
+            <h1 className="max-w-5xl text-4xl font-black tracking-tight text-white md:text-5xl">
+              Marvel Rivals draft recommendations by role.
+            </h1>
+            <p className="mt-4 max-w-3xl text-base leading-7 text-slate-400">
+              Select allied picks, enemy picks, and bans, then generate the top
+              Vanguard, Duelist, and Strategist recommendations using meta data
+              and team-up synergy.
+            </p>
           </div>
 
-          <div className="mt-8 grid gap-3 sm:grid-cols-3">
-            <StatPill label="Heroes Loaded" value={String(heroes.length)} />
-            <StatPill label="Recommendation Model" value="Meta + Synergy" />
-            <StatPill label="Results" value="Top 5 Picks" />
+          <div className="flex flex-wrap gap-3 lg:justify-end">
+            <button
+              type="button"
+              onClick={getRecommendations}
+              disabled={loadingHeroes || loadingRecommendations}
+              className="h-12 rounded-xl bg-indigo-600 px-7 text-sm font-black uppercase tracking-wide text-white shadow-lg shadow-indigo-950/40 transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loadingRecommendations ? "Generating..." : "Recommend"}
+            </button>
+
+            <button
+              type="button"
+              onClick={clearDraft}
+              className="h-12 rounded-xl border border-slate-700 bg-slate-900 px-7 text-sm font-black uppercase tracking-wide text-slate-300 transition hover:bg-slate-800"
+            >
+              Clear Draft
+            </button>
           </div>
         </header>
 
         {error && (
-          <div className="mb-6 rounded-xl border border-red-500/60 bg-red-950/60 p-4 text-sm font-semibold text-red-200">
+          <div className="mb-6 rounded-2xl border border-red-500/60 bg-red-950/60 px-5 py-4 text-sm font-semibold text-red-200">
             {error}
           </div>
         )}
 
-        <div className="grid w-full gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(30rem,0.9fr)]">
-          <section className="space-y-6">
-            {loadingHeroes ? (
-              <Panel title="Draft Builder">
-                <p className="text-slate-400">Loading hero data...</p>
-              </Panel>
-            ) : (
-              <>
-                <Panel
-                  title="Draft Builder"
-                  subtitle="Select the current match context before generating recommendations."
-                >
-                  <div className="grid gap-6 2xl:grid-cols-2">
-                    <div className="rounded-2xl border border-emerald-500/20 bg-emerald-950/10 p-5">
-                      <h3 className="mb-4 text-sm font-black uppercase tracking-wide text-emerald-400">
-                        Allied Team
-                      </h3>
-
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {myTeam.map((value, index) => (
-                          <HeroInput
-                            key={`my-team-${index}`}
-                            label={`Ally ${index + 1}`}
-                            value={value}
-                            heroes={heroes}
-                            unavailableNames={[
-                              ...myTeam.filter((name) => name && name !== value),
-                              ...bans.filter(Boolean),
-                            ]}
-                            onChange={(newValue) =>
-                              updateSlot(setMyTeam, index, newValue)
-                            }
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-red-500/20 bg-red-950/10 p-5">
-                      <h3 className="mb-4 text-sm font-black uppercase tracking-wide text-red-400">
-                        Enemy Team
-                      </h3>
-
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {enemyTeam.map((value, index) => (
-                          <HeroInput
-                            key={`enemy-team-${index}`}
-                            label={`Enemy ${index + 1}`}
-                            value={value}
-                            heroes={heroes}
-                            unavailableNames={[
-                              ...enemyTeam.filter((name) => name && name !== value),
-                              ...bans.filter(Boolean),
-                            ]}
-                            onChange={(newValue) =>
-                              updateSlot(setEnemyTeam, index, newValue)
-                            }
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </Panel>
-
-                <Panel
-                  title="Bans"
-                  subtitle="Exclude banned heroes from recommendation results."
-                >
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    {bans.map((value, index) => (
-                      <HeroInput
-                        key={`ban-${index}`}
-                        label={`Ban ${index + 1}`}
-                        value={value}
-                        heroes={heroes}
-                        unavailableNames={[
-                          ...bans.filter((name) => name && name !== value),
-                          ...myTeam.filter(Boolean),
-                          ...enemyTeam.filter(Boolean),
-                        ]}
-                        onChange={(newValue) => updateSlot(setBans, index, newValue)}
-                      />
-                    ))}
-                  </div>
-                </Panel>
-              </>
-            )}
-          </section>
-
-          <aside className="rounded-2xl border border-slate-800 bg-slate-900/95 p-6 shadow-xl">
-            <div className="mb-5 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.25em] text-indigo-400">
-                  Results
-                </p>
-                <h2 className="mt-1 text-3xl font-black">Recommended Picks</h2>
-              </div>
-
-              <span className="rounded-full border border-slate-700 bg-slate-950 px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-300">
-                Top 5
-              </span>
+        <section className="mb-8 grid gap-6 xl:grid-cols-2">
+          <Panel
+            title="Allied Team"
+            subtitle="Heroes already selected by your team are excluded from recommendations."
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              {myTeam.map((value, index) => (
+                <HeroInput
+                  key={`my-team-${index}`}
+                  label={`Ally ${index + 1}`}
+                  value={value}
+                  heroes={heroes}
+                  unavailableNames={[
+                    ...myTeam.filter((name) => name && name !== value),
+                    ...bans.filter(Boolean),
+                  ]}
+                  onChange={(newValue) => updateSlot(setMyTeam, index, newValue)}
+                />
+              ))}
             </div>
+          </Panel>
 
-            {recommendations.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950 p-10 text-center">
-                <p className="text-base font-bold text-slate-300">
-                  No recommendations yet.
-                </p>
-                <p className="mt-2 text-sm text-slate-500">
-                  Fill in the draft state and click Recommend.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {recommendations.map((recommendation, index) => (
-                  <RecommendationCard
-                    key={recommendation.hero}
-                    recommendation={recommendation}
-                    rank={index + 1}
-                  />
-                ))}
-              </div>
-            )}
-          </aside>
-        </div>
-      </div>
+          <Panel
+            title="Enemy Team"
+            subtitle="Enemy picks are draft context. Mirror picks remain eligible unless banned."
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              {enemyTeam.map((value, index) => (
+                <HeroInput
+                  key={`enemy-team-${index}`}
+                  label={`Enemy ${index + 1}`}
+                  value={value}
+                  heroes={heroes}
+                  unavailableNames={[
+                    ...enemyTeam.filter((name) => name && name !== value),
+                    ...bans.filter(Boolean),
+                  ]}
+                  onChange={(newValue) => updateSlot(setEnemyTeam, index, newValue)}
+                />
+              ))}
+            </div>
+          </Panel>
+        </section>
+
+        <section className="mb-10">
+          <Panel
+            title="Bans"
+            subtitle="Banned heroes are removed from all role recommendation groups."
+          >
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {bans.map((value, index) => (
+                <HeroInput
+                  key={`ban-${index}`}
+                  label={`Ban ${index + 1}`}
+                  value={value}
+                  heroes={heroes}
+                  unavailableNames={[
+                    ...bans.filter((name) => name && name !== value),
+                    ...myTeam.filter(Boolean),
+                    ...enemyTeam.filter(Boolean),
+                  ]}
+                  onChange={(newValue) => updateSlot(setBans, index, newValue)}
+                />
+              ))}
+            </div>
+          </Panel>
+        </section>
+
+        <section>
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="mb-2 text-sm font-semibold uppercase tracking-[0.25em] text-indigo-400">
+                Recommendations
+              </p>
+              <h2 className="text-3xl font-black tracking-tight text-white">
+                Top picks by position
+              </h2>
+            </div>
+          </div>
+
+          {!hasRecommendations ? (
+            <section className="rounded-3xl border border-dashed border-slate-700 bg-slate-900/70 p-12 text-center shadow-xl">
+              <h3 className="text-xl font-black text-white">
+                No recommendations yet
+              </h3>
+              <p className="mt-2 text-sm text-slate-400">
+                Build the draft state above, then click Recommend.
+              </p>
+            </section>
+          ) : (
+            <div className="grid gap-6 xl:grid-cols-3">
+              {RECOMMENDATION_ROLES.map((role) => (
+                <section
+                  key={role}
+                  className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 shadow-xl"
+                >
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-xl font-black text-white">{role}</h3>
+                    <span className="rounded-full border border-slate-700 bg-slate-950 px-3 py-1 text-xs font-black uppercase tracking-wide text-slate-400">
+                      Top 3
+                    </span>
+                  </div>
+
+                  {recommendations[role].length === 0 ? (
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-6 text-sm text-slate-500">
+                      No eligible {role.toLowerCase()} recommendations.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {recommendations[role].map((recommendation, index) => (
+                        <RecommendationCard
+                          key={`${role}-${recommendation.hero}`}
+                          recommendation={recommendation}
+                          rank={index + 1}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              ))}
+            </div>
+          )}
+        </section>
+      </section>
     </main>
   );
 }
